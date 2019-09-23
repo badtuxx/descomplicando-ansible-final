@@ -1,0 +1,12 @@
+- name: Copying deployment file to host
+  template:
+    src: app-v2-canary.yml.j2
+    dest: /opt/giropops/app-v2-canary.yml
+    owner: root
+    group: root
+    mode: 0644
+  register: copying_template_register
+
+- name: Deploy Giropops App deployment
+  shell: kubectl apply -f /opt/giropops/app-v2-canary.yml
+  register: deploy_deployment_register

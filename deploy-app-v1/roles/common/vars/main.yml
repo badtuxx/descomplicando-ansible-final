@@ -1,0 +1,10 @@
+---
+# vars file for common
+
+# Giropops app
+number_replicas: 10
+version: 1.0.0
+prometheus_scrape: "true"
+prometheus_port: 32111
+nginx_port: 80
+environment: production

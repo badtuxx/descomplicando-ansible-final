@@ -1,0 +1,100 @@
+- name: Criando o Security Group
+  local_action:
+    module: ec_dois_group
+    name: "{{ security_group }}"
+    description: Security Group Giropops
+    region: "{{ region }}"
+    profile: "{{ profile }}"
+    rules:
+    - proto: tcp
+      from_port: 22
+      to_port: 22
+      cidr_ip: 0.0.0.0/0
+      rule_desc: SSH
+    - proto: tcp
+      from_port: 2379
+      to_port: 2380
+      cidr_ip: 0.0.0.0/0
+      rule_desc: etcd server API
+    - proto: tcp
+      from_port: 6443
+      to_port: 6443
+      cidr_ip: 0.0.0.0/0
+      rule_desc: kube-apiserver
+    - proto: tcp
+      from_port: 10250
+      to_port: 10250
+      cidr_ip: 0.0.0.0/0
+      rule_desc: Kubelet API
+    - proto: tcp
+      from_port: 10251
+      to_port: 10251
+      cidr_ip: 0.0.0.0/0
+      rule_desc: kube-scheduler
+    - proto: tcp
+      from_port: 10252
+      to_port: 10252
+      cidr_ip: 0.0.0.0/0
+      rule_desc: kube-controller-manager
+    - proto: tcp
+      from_port: 10255
+      to_port: 10255
+      cidr_ip: 0.0.0.0/0
+      rule_desc: Kubelet API Read-only
+    - proto: tcp
+      from_port: 30000
+      to_port: 32767
+      cidr_ip: 0.0.0.0/0
+      rule_desc: NodePort Services
+    rules_egress:
+    - proto: all
+      cidr_ip: 0.0.0.0/0
+  register: basic_firewall
+
+- name: Criando a instancia EC2
+  local_action: ec_dois
+    group={{ security_group }}
+    instance_type={{ instance_type }}
+    image={{ image }}
+    profile="{{ profile }}"
+    wait=true
+    region={{ region }}
+    keypair={{ keypair }}
+    count={{ count }}
+  register: ec_dois
+
+- name: Adicionando a instancia ao inventario temp
+  add_host: name={{ item.public_ip }} groups=giropops-new
+  with_items: "{{ ec_dois.instances }}"
+
+- name: Adicionando o ip publico da instancia criada no arquivo hosts
+  local_action: lineinfile
+    dest="./hosts"
+    regexp={{ item.public_ip }}
+    insertafter="[ip-publico]" line={{ item.public_ip }}
+  with_items: "{{ ec_dois.instances }}"
+
+- name: Adicionando o ip privado da instancia criada no arquivo hosts
+  local_action: lineinfile
+    dest="./hosts"
+    regexp={{ item.privado_ip }}
+    insertafter="[ip-privado]" line={{ item.privado_ip }}
+  with_items: "{{ ec_dois.instances }}"
+
+- name: Esperando o SSH
+  local_action: wait_for
+    host={{ item.public_ip }}
+    port=22
+    state=started
+  with_items: "{{ ec_dois.instances }}"
+
+- name: Adicionando um nome tag na instancia
+  local_action: ec_dois_tag resource={{ item.id }} region={{ region }} profile={{ profile }} state=present
+  with_items: "{{ ec_dois.instances }}"
+  args:
+    tags:
+      Name: ansible-{{ item.ami_launch_index|int + 1 }}
+
+- name: Adicionando a maquina criada no known_hosts
+  shell: ssh-keyscan -H {{ item.public_ip }} >> ~/.ssh/known_hosts
+  with_items: "{{ ec_dois.instances }}"

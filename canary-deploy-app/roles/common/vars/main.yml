@@ -1,0 +1,8 @@
+---
+# vars file for common
+number_replicas: 1
+version: 2.0.0
+prometheus_scrape: "true"
+prometheus_port: 32111
+nginx_port: 80
+environment: production
